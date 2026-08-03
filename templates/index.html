@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+    <meta charset="UTF-8">
+    <title>Face Control System</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #1a1a2e; color: white; text-align: center; margin: 0; padding: 20px; }
+        h1 { color: #00fff5; }
+        .container { display: flex; justify-content: center; gap: 20px; margin-top: 20px; flex-wrap: wrap; }
+        .box { background: #16213e; padding: 15px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        video, img { width: 480px; height: 360px; border-radius: 8px; border: 2px solid #00fff5; background: black; }
+    </style>
+</head>
+<body>
+    <h1>🤖 Face Control Dashboard</h1>
+    <p>Kamera görüntüsü noutbukdan götürülür, emal isə Əsas PC-də gedir.</p>
+
+    <div class="container">
+        <div class="box">
+            <h3>Noutbuk Kamerası (Local)</h3>
+            <video id="webcam" autoplay playsinline muted></video>
+        </div>
+        <div class="box">
+            <h3>Server Nəticəsi (Processed)</h3>
+            <img id="processedFrame" src="" alt="Görüntü gözlənilir...">
+        </div>
+    </div>
+
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <script>
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('canvas');
+    const processedImg = document.getElementById('processedFrame');
+    const ctx = canvas.getContext('2d');
+
+    // Kamera icazəsini alırıq
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                video.play();
+                // Kamera tam aktivləşdikdən sonra kadr göndərməyə başlayır
+                setInterval(sendFrame, 150); 
+            };
+        })
+        .catch(err => {
+            alert("Kamera icazəsi alınmadı və ya bloklandı! Brauzer ayarlarını yoxlayın.\nXəta: " + err);
+        });
+
+    function sendFrame() {
+        if (!video.videoWidth || !video.videoHeight) return;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(blob => {
+            if (!blob) return;
+
+            const formData = new FormData();
+            formData.append('image', blob, 'frame.jpg');
+
+            fetch('/process_stream', { method: 'POST', body: formData })
+            .then(res => {
+                if (!res.ok) throw new Error("Server error");
+                return res.blob();
+            })
+            .then(imgBlob => {
+                processedImg.src = URL.createObjectURL(imgBlob);
+            })
+            .catch(err => console.error("Kadr xətası:", err));
+        }, 'image/jpeg', 0.6);
+    }
+    </script>
+</body>
+</html>
